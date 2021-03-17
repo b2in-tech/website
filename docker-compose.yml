@@ -1,0 +1,66 @@
+version: '3.7'
+
+services:
+  wordpress:
+    image: wordpress:5.7.0-fpm-alpine
+    # build: ./.docker/wp
+    container_name: b2in-wordpress
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      - WORDPRESS_DB_HOST=db:3306
+      - WORDPRESS_DB_USER=${MYSQL_USER}
+      - WORDPRESS_DB_PASSWORD=${MYSQL_PASSWORD}
+      - WORDPRESS_DB_NAME=${WORDPRESS_DATABASE_NAME}
+    volumes:
+      - .docker/wpdata:/var/www/html
+      - .docker/wp/custom.ini:/usr/local/etc/php/conf.d/custom.ini
+    networks:
+      - b2in-network
+    depends_on:
+      - db
+
+  db:
+    image: mysql:8.0
+    container_name: b2in-db
+    restart: unless-stopped
+    env_file: ./.env
+    environment:
+      - MYSQL_DATABASE=${WORDPRESS_DATABASE_NAME}
+    volumes:
+      - .docker/dbdata:/var/lib/mysql
+    command: '--default-authentication-plugin=mysql_native_password'
+    networks:
+      - b2in-network
+
+  nginx:
+    build: .docker/nginx
+    container_name: b2in-nginx
+    restart: always
+    tty: true
+    ports:
+      - "8080:80"
+    volumes:
+      - ./.docker/wpdata:/var/www/html
+      - certbot-etc:/etc/letsencrypt
+    networks:
+      - b2in-network
+    depends_on:
+      - wordpress
+  
+  # certbot:
+  #   image: certbot/certbot
+  #   container_name: certbot
+  #   volumes:
+  #     - certbot-etc:/etc/letsencrypt
+  #     - ./.docker/wpdata:/var/www/html
+  #   command: certonly --webroot --webroot-path=/var/www/html --email b2in.consulting@gmail.com --agree-tos --no-eff-email --staging -d b2in.tech -d www.b2in.tech
+  #   depends_on:
+  #     - nginx
+
+volumes:
+  certbot-etc:
+
+networks:
+  b2in-network:
+    driver: bridge
